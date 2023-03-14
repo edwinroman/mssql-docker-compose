@@ -1,0 +1,23 @@
+version: "3.8"
+services:
+  mssqldb:
+    container_name: mssqldb
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    ports:
+      - "1433:1433"
+    environment:
+      - SA_PASSWORD=${MSSQL_SA_PASSWORD}
+      - ACCEPT_EULA="Y"
+      - MSSQL_PID=${MSSQL_PID}
+      - TZ=${MSSQL_TZ}
+    networks:
+      - development-network
+    volumes:
+      - ${MSSQL_HOST_DATA}/data:/var/opt/mssql/data
+      - ${MSSQL_HOST_DATA}/log:/var/opt/mssql/log
+      - ${MSSQL_HOST_DATA}/secrets:/var/opt/mssql/secrets
+
+networks:  
+  development-network:
+    name: development-network
+    driver: bridge
