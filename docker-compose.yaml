@@ -2,6 +2,7 @@ version: "3.8"
 services:
   mssqldb:
     container_name: mssqldb
+    command: /bin/bash /entrypoint.sh
     image: mcr.microsoft.com/mssql/server:2022-latest
     ports:
       - "1433:1433"
@@ -10,13 +11,18 @@ services:
       - ACCEPT_EULA="Y"
       - MSSQL_PID=${MSSQL_PID}
       - TZ=${MSSQL_TZ}
+      - MSSQL_DB_USERNAME=${MSSQL_DB_USERNAME}
+      - MSSQL_DB_PASSWORD=${MSSQL_DB_PASSWORD}
+      - MSSQL_DB_DEFAULT=${MSSQL_DB_DEFAULT}
     networks:
       - development-network
     volumes:
       - ${MSSQL_HOST_DATA}/data:/var/opt/mssql/data
       - ${MSSQL_HOST_DATA}/log:/var/opt/mssql/log
       - ${MSSQL_HOST_DATA}/secrets:/var/opt/mssql/secrets
-
+      - ./docker-entrypoint.sh:/entrypoint.sh
+      - ./docker-db-init.sql:/db-init.sql
+      
 networks:  
   development-network:
     name: development-network
