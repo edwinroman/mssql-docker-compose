@@ -1,4 +1,5 @@
-version: "3.8"
+name: mssql-docker-compose 
+
 services:
   mssqldb:
     container_name: mssqldb
