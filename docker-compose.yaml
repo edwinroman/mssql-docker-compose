@@ -1,10 +1,8 @@
-name: mssql-docker-compose 
-
 services:
   mssqldb:
     container_name: mssqldb
-    command: /bin/bash /entrypoint.sh
     image: mcr.microsoft.com/mssql/server:2022-latest
+    user: root
     ports:
       - "1433:1433"
     environment:
@@ -18,13 +16,70 @@ services:
     networks:
       - development-network
     volumes:
-      - ${MSSQL_HOST_DATA}/data:/var/opt/mssql/data
-      - ${MSSQL_HOST_DATA}/log:/var/opt/mssql/log
-      - ${MSSQL_HOST_DATA}/secrets:/var/opt/mssql/secrets
-      - ./docker-entrypoint.sh:/entrypoint.sh
+      - mssql_data:/var/opt/mssql/data
+      - mssql_log:/var/opt/mssql/log
+      - mssql_secrets:/var/opt/mssql/secrets
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          '/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P ''${MSSQL_SA_PASSWORD}'' -Q "SELECT 1"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  mssql-tools:
+    image: mcr.microsoft.com/mssql-tools:latest
+    restart: no
+    command: "/opt/mssql-tools/bin/sqlcmd -C -S mssqldb -l 5 -U sa -P '${MSSQL_SA_PASSWORD}' -d master -i /db-init.sql"
+    environment:
+      - SA_PASSWORD=${MSSQL_SA_PASSWORD}
+      - MSSQL_DB_USERNAME=${MSSQL_DB_USERNAME}
+      - MSSQL_DB_PASSWORD=${MSSQL_DB_PASSWORD}
+      - MSSQL_DB_DEFAULT=${MSSQL_DB_DEFAULT}
+    networks:
+      - development-network
+    volumes:
       - ./docker-db-init.sql:/db-init.sql
-      
-networks:  
+    depends_on:
+      mssqldb:
+        condition: service_healthy
+
+  mssql-dacpac:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    restart: no
+    environment:
+      - SA_PASSWORD=${MSSQL_SA_PASSWORD}
+    networks:
+      - development-network
+    command: >
+      /bin/bash -c "
+      echo 'Installing sqlpackage tool...';
+      export PATH=/root/.dotnet/tools:/usr/share/dotnet:/usr/bin;
+      dotnet tool update microsoft.sqlpackage --global --verbosity minimal;
+      echo 'Importing dacpac...';
+      sqlpackage /Action:Publish
+      /TargetDatabaseName:dbApplication
+      /TargetServerName:mssqldb
+      /TargetUser:sa
+      /TargetPassword:'${MSSQL_SA_PASSWORD}'
+      /SourceFile:/dbApplication.dacpac          
+      /TargetTrustServerCertificate:true
+      /TargetTimeout:5;"
+    depends_on:
+      mssqldb:
+        condition: service_healthy
+    volumes:
+      - ./dbApplication.dacpac:/dbApplication.dacpac
+
+volumes:
+  mssql_data:
+  mssql_log:
+  mssql_secrets:
+
+networks:
   development-network:
     name: development-network
     driver: bridge
